@@ -1,0 +1,5 @@
+# CSVファイルは保持するが、機密データは除外
+*.bak
+*.tmp
+*_backup.*
+export_*
