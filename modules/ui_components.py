@@ -90,11 +90,9 @@ def show_main_page():
     st.markdown("---")
     st.subheader("📈 最近の分析サマリー")
 
-    # データ読み込み
-    fixed_df = DataManager.load_data(DataManager.get_file_paths()["fixed_stock"])
-    selection_df = DataManager.load_data(
-        DataManager.get_file_paths()["stock_selection"]
-    )
+    # データ読み込み（SQLiteデータベースから）
+    fixed_df = DataManager.load_fixed_stock_data()
+    selection_df = DataManager.load_stock_selection_data()
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -143,6 +141,17 @@ def show_fixed_stock_analysis():
     st.title("📊 固定銘柄でのLLM予測精度検証")
     st.markdown("同一銘柄に対する複数LLMの予測精度を比較分析します。")
     st.markdown("---")
+
+    # セッション状態の初期化
+    if "fixed_stock_saved" not in st.session_state:
+        st.session_state.fixed_stock_saved = False
+
+    # 保存成功後のメッセージ表示
+    if st.session_state.fixed_stock_saved:
+        st.success(
+            "✅ 前回のデータが正常に保存されました！履歴分析ページで確認できます。"
+        )
+        st.session_state.fixed_stock_saved = False
 
     # 入力フォーム
     with st.form("fixed_stock_form"):
@@ -280,7 +289,7 @@ def _process_fixed_stock_simulation(
             """)
 
     # 保存確認
-    if st.button("💾 結果を保存", type="primary"):
+    if st.button("💾 結果を保存", type="primary", key="save_fixed_stock"):
         save_data = {
             "execution_date": datetime.now(),
             "model_id": model_id,
@@ -298,8 +307,8 @@ def _process_fixed_stock_simulation(
         }
 
         if DataManager.save_fixed_stock_analysis(save_data):
-            st.success("✅ データが正常に保存されました！")
-            st.balloons()
+            st.session_state.fixed_stock_saved = True
+            st.rerun()  # ページを再読み込み
         else:
             st.error("❌ データの保存に失敗しました。")
 
@@ -309,6 +318,17 @@ def show_stock_selection_analysis():
     st.title("🎯 LLM銘柄選定能力検証")
     st.markdown("LLMの銘柄選定能力を期間別に検証・分析します。")
     st.markdown("---")
+
+    # セッション状態の初期化
+    if "stock_selection_saved" not in st.session_state:
+        st.session_state.stock_selection_saved = False
+
+    # 保存成功後のメッセージ表示
+    if st.session_state.stock_selection_saved:
+        st.success(
+            "✅ 前回のデータが正常に保存されました！履歴分析ページで確認できます。"
+        )
+        st.session_state.stock_selection_saved = False
 
     # 入力フォーム
     with st.form("stock_selection_form"):
@@ -458,7 +478,7 @@ def _process_stock_selection_simulation(
     )
 
     # 保存確認
-    if st.button("💾 結果を保存", type="primary"):
+    if st.button("💾 結果を保存", type="primary", key="save_stock_selection"):
         save_data = {
             "execution_date": datetime.now(),
             "analysis_period": analysis_period,
@@ -476,8 +496,8 @@ def _process_stock_selection_simulation(
         }
 
         if DataManager.save_stock_selection_analysis(save_data):
-            st.success("✅ データが正常に保存されました！")
-            st.balloons()
+            st.session_state.stock_selection_saved = True
+            st.rerun()  # ページを再読み込み
         else:
             st.error("❌ データの保存に失敗しました。")
 
@@ -551,11 +571,46 @@ def show_history_analysis():
     st.markdown("過去の分析結果を統計的に評価し、LLMのパフォーマンスを比較します。")
     st.markdown("---")
 
-    # データ読み込み
-    fixed_df = DataManager.load_data(DataManager.get_file_paths()["fixed_stock"])
-    selection_df = DataManager.load_data(
-        DataManager.get_file_paths()["stock_selection"]
-    )
+    # データの強制再読み込みボタン
+    if st.button("🔄 データを再読み込み", type="secondary"):
+        st.cache_data.clear()
+        st.rerun()
+
+    # データ読み込み（SQLiteデータベースから）
+    fixed_df = DataManager.load_fixed_stock_data()
+    selection_df = DataManager.load_stock_selection_data()
+
+    # デバッグ情報を表示
+    if st.checkbox("🔍 デバッグ情報を表示", key="debug_info"):
+        st.write("**データベース情報:**")
+        debug_info = DataManager.get_debug_info()
+        st.json(debug_info)
+
+        st.write("**データ情報:**")
+        st.write(f"固定銘柄分析データ数: {len(fixed_df)}")
+        st.write(f"銘柄選定分析データ数: {len(selection_df)}")
+
+        if not fixed_df.empty:
+            st.write("**固定銘柄分析データ（最新5件）:**")
+            st.dataframe(fixed_df.head())
+
+        if not selection_df.empty:
+            st.write("**銘柄選定分析データ（最新5件）:**")
+            st.dataframe(selection_df.head())
+
+        # データベース管理機能
+        st.write("**データベース管理:**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📤 CSVエクスポート"):
+                DataManager.export_to_csv()
+        with col2:
+            if st.button("🧪 データベーステスト"):
+                DataManager.test_database_connection()
+        with col3:
+            if st.button("🗑️ 全データ削除", type="secondary"):
+                if st.button("本当に削除しますか？", type="secondary"):
+                    DataManager.clear_all_data()
 
     if fixed_df.empty and selection_df.empty:
         st.warning(

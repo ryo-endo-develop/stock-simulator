@@ -2,6 +2,7 @@ import warnings
 
 import streamlit as st
 
+from modules.data_manager import DataManager
 from modules.ui_components import (
     show_fixed_stock_analysis,
     show_history_analysis,
@@ -10,6 +11,14 @@ from modules.ui_components import (
 )
 
 warnings.filterwarnings("ignore")
+
+# アプリケーション起動時にデータベースを初期化
+print("🚀 アプリケーション起動中...")
+init_result = DataManager.init_database()
+if init_result:
+    print("✅ データベース初期化完了")
+else:
+    print("❌ データベース初期化に問題が発生しました")
 
 # ページ設定
 st.set_page_config(
